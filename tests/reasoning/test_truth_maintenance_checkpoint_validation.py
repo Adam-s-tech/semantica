@@ -114,6 +114,22 @@ def test_reject_unknown_top_level_field():
 
 
 @pytest.mark.parametrize(
+    "record",
+    [
+        lambda payload: payload,
+        lambda payload: payload["rules"][0],
+        lambda payload: payload["support_catalog"][0],
+    ],
+    ids=["top-level", "rule-record", "catalog-record"],
+)
+def test_reject_non_string_field_names(record):
+    payload = checkpoint_payload()
+    record(payload)[42] = "invalid"
+    with pytest.raises(ValidationError):
+        decode_checkpoint(payload)
+
+
+@pytest.mark.parametrize(
     "value",
     [0, 2, True, 1.0, "1", None],
     ids=["zero", "two", "bool", "float", "str", "null"],
@@ -140,6 +156,22 @@ def test_reject_invalid_session_version(value):
 def test_reject_version_zero_with_non_empty_catalog():
     payload = checkpoint_payload()
     payload["session_version"] = 0
+    with pytest.raises(ValidationError):
+        decode_checkpoint(payload)
+
+
+def test_reject_positive_version_with_empty_catalog():
+    payload = checkpoint_payload()
+    payload["support_catalog"] = []
+    payload["active_support_ids"] = []
+    with pytest.raises(ValidationError):
+        decode_checkpoint(payload)
+
+
+def test_reject_single_commit_with_all_supports_inactive():
+    payload = checkpoint_payload()
+    payload["session_version"] = 1
+    payload["active_support_ids"] = []
     with pytest.raises(ValidationError):
         decode_checkpoint(payload)
 

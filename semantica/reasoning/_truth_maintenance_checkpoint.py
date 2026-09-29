@@ -50,6 +50,13 @@ def _fail(message: str, field: str, **details: object) -> ValidationError:
 
 def _require_exact_keys(record: dict, expected: FrozenSet[str], location: str) -> None:
     actual = set(record)
+    non_string_keys = [key for key in actual if not isinstance(key, str)]
+    if non_string_keys:
+        raise _fail(
+            "checkpoint field names must be strings",
+            location or "checkpoint",
+            key_types=sorted({type(key).__name__ for key in non_string_keys}),
+        )
     missing = expected - actual
     unknown = actual - expected
     if not missing and not unknown:
@@ -255,6 +262,22 @@ def decode_checkpoint(payload: object) -> _DecodedCheckpoint:
         payload["active_support_ids"],
         frozenset(support.support_id for support in catalog_supports),
     )
+
+    # An empty catalog cannot follow an effective commit.  Withdrawing every
+    # support requires at least an initial insertion and a final retraction.
+    if not catalog_supports and session_version > 0:
+        raise _fail(
+            "session_version cannot be positive when the support catalog is empty",
+            "session_version",
+            session_version=session_version,
+        )
+    if catalog_supports and not active_support_ids and session_version < 2:
+        raise _fail(
+            "session_version must be at least two when no supports are active",
+            "session_version",
+            session_version=session_version,
+            catalog_size=len(catalog_supports),
+        )
 
     return _DecodedCheckpoint(
         session_version=session_version,

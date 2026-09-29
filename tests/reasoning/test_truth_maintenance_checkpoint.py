@@ -681,6 +681,18 @@ def test_rule_only_predicate_arity_survives_restore_without_catalog_facts():
             active=["active"],
             session_version=1,
         ),
+        checkpoint_payload(
+            rules=[],
+            catalog={},
+            active=[],
+            session_version=1,
+        ),
+        checkpoint_payload(
+            rules=[],
+            catalog={"source": "A(a)"},
+            active=[],
+            session_version=1,
+        ),
     ],
     ids=[
         "invalid-condition",
@@ -692,6 +704,8 @@ def test_rule_only_predicate_arity_survives_restore_without_catalog_facts():
         "indirect-cycle",
         "rule-arity-conflict",
         "inactive-fact-arity-conflict",
+        "positive-version-empty-catalog",
+        "single-commit-all-supports-inactive",
     ],
 )
 def test_semantic_rejection_leaves_payload_unchanged(payload):
@@ -699,6 +713,23 @@ def test_semantic_rejection_leaves_payload_unchanged(payload):
     with pytest.raises(ValidationError):
         TruthMaintenanceSession.from_checkpoint(payload)
     assert payload == before
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        lambda payload: payload,
+        lambda payload: payload["rules"][0],
+        lambda payload: payload["support_catalog"][0],
+    ],
+    ids=["top-level", "rule-record", "catalog-record"],
+)
+def test_non_string_field_names_raise_validation_error(record):
+    payload = json.loads(CHECKPOINT_V1_JSON)
+    record(payload)[42] = "invalid"
+
+    with pytest.raises(ValidationError):
+        TruthMaintenanceSession.from_checkpoint(payload)
 
 
 def test_export_uses_captured_rules_not_caller_rule_mutation():

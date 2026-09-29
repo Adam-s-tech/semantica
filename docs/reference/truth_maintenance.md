@@ -169,10 +169,12 @@ The fixed v1 schema is:
 
 The top level and each rule/catalog record have exact field sets; missing and
 unknown fields are rejected. `format_version` must be integer `1`;
-`session_version` must be a non-negative integer, and a non-empty support
-catalog requires a positive version because it represents at least one
-committed update. Rules and catalog facts are semantic values, so invalid
-atoms, variables in facts, recursive rules, and arity conflicts are rejected
+`session_version` must be a non-negative integer. A non-empty support catalog
+requires a positive version because it represents at least one committed
+update; an empty catalog requires version zero, and a non-empty catalog with no
+active supports requires at least two commits. Rules and catalog facts are
+semantic values, so invalid atoms, variables in facts, recursive rules, and
+arity conflicts are rejected
 with the same `ValidationError` used by construction and `apply()`.
 Unsupported future formats are also rejected, and restore never returns a
 partially reconstructed session.
