@@ -414,7 +414,25 @@ def compare_continuation_pair(
     )
     assert uninterrupted.snapshot() == resumed.snapshot(), context
     assert uninterrupted.to_checkpoint() == resumed.to_checkpoint(), context
-    assert uninterrupted.to_checkpoint() == expected_payload, context
+    actual_payload = uninterrupted.to_checkpoint()
+    assert (
+        actual_payload["format_version"] == expected_payload["format_version"]
+    ), context
+    assert (
+        actual_payload["session_version"] == expected_payload["session_version"]
+    ), context
+    assert (
+        actual_payload["support_catalog"] == expected_payload["support_catalog"]
+    ), context
+    assert (
+        actual_payload["active_support_ids"] == expected_payload["active_support_ids"]
+    ), context
+    # Rule order comparison deliberately ignores serialization order: the
+    # session exports rules in internal topological order, while condition
+    # order inside each rule remains semantically significant and is preserved.
+    assert sorted(actual_payload["rules"], key=lambda rule: rule["rule_id"]) == sorted(
+        expected_payload["rules"], key=lambda rule: rule["rule_id"]
+    ), context
 
     relevant_facts = set(uninterrupted.facts) | set(removed_facts)
     for fact in relevant_facts:
@@ -576,7 +594,14 @@ def run_checkpoint_seed(seed):
     rng = random.Random(seed)
     rules = generate_rules(rng)
     uninterrupted = build_session(rules)
-    expected_rule_payload = build_session(rules).to_checkpoint()["rules"]
+    expected_rule_payload = [
+        {
+            "rule_id": rule_id,
+            "conditions": [atom_text(atom) for atom in body_atoms],
+            "conclusion": atom_text(head_atom),
+        }
+        for rule_id, body_atoms, head_atom in rules
+    ]
 
     supports = {}
     catalog = {}
