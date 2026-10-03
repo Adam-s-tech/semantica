@@ -1751,6 +1751,28 @@ class TestDecision:
         assert cli_module._tag_filter_value("tag:tag") == "tag"
         assert cli_module._tag_filter_value("plain") == "plain"
 
+    @pytest.mark.parametrize("filter_str", ["tag:", ""])
+    def test_query_empty_tag_filter_is_rejected(self, runner, monkeypatch, filter_str):
+        """An empty tag value matched every decision; it must be a usage error."""
+        fake_dq = MagicMock()
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "semantica.context.decision_query",
+            _fake_module(DecisionQuery=lambda *a, **kw: fake_dq),
+        )
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "semantica.graph_store",
+            _fake_module(GraphStore=MagicMock(return_value=MagicMock())),
+        )
+
+        result = runner.invoke(
+            cli_module.main,
+            ["decision", "query", "--filter", filter_str, "--format", "json"],
+        )
+        assert result.exit_code != 0
+        fake_dq.find_by_time_range.assert_not_called()
+
     def test_trace_import_error_is_clean(self, runner):
         with patch("builtins.__import__", side_effect=lambda n, *a, **k: (
             (_ for _ in ()).throw(ImportError(n))
